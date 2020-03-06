@@ -10,11 +10,18 @@
 #include <Mesh/pzgmesh.h>
 #include <Mesh/pzcmesh.h>
 #include <Mesh/pzintel.h>
+
 #include <Geom/pzgeotriangle.h>
 #include <Geom/pzgeoquad.h>
+#include <Geom/pzgeotetrahedra.h>
+#include <Geom/pzgeoprism.h>
+#include <Geom/TPZGeoCube.h>
+#include <Geom/pzgeopyramid.h>
+
 #include <Post/TPZVTKGeoMesh.h>
 #include <Material/TPZNullMaterial.h>
 #include <Material/TPZVecL2.h>
+#include <Geom/pzgeotetrahedra.h>
 
 template<class TGeo>
 void AddSampleElement(TPZGeoMesh& gmesh);
@@ -25,6 +32,12 @@ void CheckDivergenceOnInternalConnect();
 int main() {
 
     CheckDivergenceOnInternalConnect<pzgeom::TPZGeoTriangle>();
+    CheckDivergenceOnInternalConnect<pzgeom::TPZGeoQuad>();
+    CheckDivergenceOnInternalConnect<pzgeom::TPZGeoTetrahedra>();
+    CheckDivergenceOnInternalConnect<pzgeom::TPZGeoPrism>();
+    CheckDivergenceOnInternalConnect<pzgeom::TPZGeoCube>();
+    // Pyramid fails since its space is not complete
+    //CheckDivergenceOnInternalConnect<pzgeom::TPZGeoPyramid>();
 
     std::cout << "Blob\n";
 }
@@ -56,7 +69,7 @@ void CheckDivergenceOnInternalConnect() {
     cmesh->SetDefaultOrder(2);
     cmesh->SetDimModel(dim);
 
-    TPZVecL2 *mat = new TPZVecL2(1);
+    TPZNullMaterial *mat = new TPZNullMaterial(1);
     mat->SetDimension(dim);
     cmesh->InsertMaterialObject(mat);
     cmesh->ApproxSpace().SetAllCreateFunctionsHDiv(dim);
@@ -79,16 +92,18 @@ void CheckDivergenceOnInternalConnect() {
     TPZConnect &con = fluxEl->Connect(fluxEl->NConnects() - 1);
 
     // Creates integration rule on edge
-    const int pOrderIntRule = fluxEl->EffectiveSideOrder(gel->NSides() - 1) * 2;;
+    const int pOrderIntRule = fluxEl->EffectiveSideOrder(gel->NSides() - 1) * 2;
     TPZIntPoints *intRule = gel->CreateSideIntegrationRule(gel->NSides() - 1, pOrderIntRule);
 
-    TPZManVector<REAL, 3> xi(2, 0);
+    TPZManVector<REAL, 3> xi(dim, 0);
     REAL w;
 
     // Stores results of the integration
     const int nInternalPhi = con.NShape();
-    const int nShapeF = fluxEl->NShapeF();
-    TPZFMatrix<REAL> numericalIntegration(nShapeF, 1, 0);
+    const int firstInternalPhi = fluxEl->NShapeF() - nInternalPhi;
+    
+    //TPZFMatrix<REAL> integrationResult(nInternalPhi, 1, 0);
+    TPZFMatrix<REAL> integrationResult(fluxEl->NShapeF(), 1, 0);
 
     const int npts = intRule->NPoints();
     for (auto ipt = 0; ipt < npts; ipt++) {
@@ -97,18 +112,22 @@ void CheckDivergenceOnInternalConnect() {
         fluxEl->ComputeRequiredData(elData, xi);
         elData.ComputeFunctionDivergence();
 
-        if (ipt == 0) {
-            elData.Print(std::cout);
+       // if (ipt == 0) {
+       //     elData.Print(std::cout);
+       // }
+        
+        //for (int iPhi = 0; iPhi < nInternalPhi; iPhi++) {
+        for (int iPhi = 0; iPhi < fluxEl->NShapeF(); iPhi++) {
+            //integrationResult(iPhi, 0) += w * elData.divphi(iPhi + firstInternalPhi, 0);
+            integrationResult(iPhi, 0) += w * elData.divphi(iPhi, 0);
         }
-
-
-        for (int iPhi = 0; iPhi < nShapeF; iPhi++) {
-            numericalIntegration(iPhi, 0) += w * elData.divphi(iPhi, 0);
-        }
-
     }
-
-    for (int i = 0; i < numericalIntegration.Rows(); i++) {
-        std::cout << numericalIntegration(i, 0) << '\n';
+    
+    bool isZero;
+    for (int i = 0; i < integrationResult.Rows(); i++) {
+   //     if (IsZero(integrationResult(i, 0))) {
+            std::cout << integrationResult(i, 0) << '\n';
+ //       }
     }
+    std::cout << std::endl;
 }
