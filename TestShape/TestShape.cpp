@@ -61,7 +61,7 @@ void AddSampleElement(TPZGeoMesh& gmesh) {
 template<class TGeo>
 void CheckDivergenceOnInternalConnect() {
 
-    // Creates element mesh
+    // Create element mesh
     TPZGeoMesh *gmesh = new TPZGeoMesh();
     AddSampleElement<TGeo>(*gmesh);
     int dim = gmesh->Dimension();
@@ -80,7 +80,7 @@ void CheckDivergenceOnInternalConnect() {
     if (!fluxEl) DebugStop();
     if (fluxEl->Material()->Id() != 1) DebugStop();
 
-    // Gets flux geometric element
+    // Get flux geometric element
     const auto gel = fluxEl->Reference();
     if (!gel) DebugStop();
 
@@ -88,24 +88,25 @@ void CheckDivergenceOnInternalConnect() {
     TPZMaterialData elData;
     fluxEl->InitMaterialData(elData);
 
-    // Gets last connect, which is the one that contains internal shape functions
+    // Get last connect, which is the one that contains internal shape functions
     TPZConnect &con = fluxEl->Connect(fluxEl->NConnects() - 1);
 
-    // Creates integration rule on edge
+    // Create integration rule on volume side
     const int pOrderIntRule = fluxEl->EffectiveSideOrder(gel->NSides() - 1) * 2;
     TPZIntPoints *intRule = gel->CreateSideIntegrationRule(gel->NSides() - 1, pOrderIntRule);
 
-    TPZManVector<REAL, 3> xi(dim, 0);
-    REAL w;
-
-    // Stores results of the integration
+    // Get shape function indexes to be iterated
     const int nInternalPhi = con.NShape();
     const int firstInternalPhi = fluxEl->NShapeF() - nInternalPhi;
     
-    //TPZFMatrix<REAL> integrationResult(nInternalPhi, 1, 0);
-    TPZFMatrix<REAL> integrationResult(fluxEl->NShapeF(), 1, 0);
-
+    // Create matrix to store the integration results
+    TPZFMatrix<REAL> integrationResult(nInternalPhi, 1, 0);
+    //TPZFMatrix<REAL> integrationResult(fluxEl->NShapeF(), 1, 0);
+   
+    // Start divergence integration
     const int npts = intRule->NPoints();
+    TPZManVector<REAL, 3> xi(dim, 0);
+    REAL w;
     for (auto ipt = 0; ipt < npts; ipt++) {
         intRule->Point(ipt, xi, w);
 
@@ -116,13 +117,14 @@ void CheckDivergenceOnInternalConnect() {
        //     elData.Print(std::cout);
        // }
         
-        //for (int iPhi = 0; iPhi < nInternalPhi; iPhi++) {
-        for (int iPhi = 0; iPhi < fluxEl->NShapeF(); iPhi++) {
-            //integrationResult(iPhi, 0) += w * elData.divphi(iPhi + firstInternalPhi, 0);
-            integrationResult(iPhi, 0) += w * elData.divphi(iPhi, 0);
+        for (int iPhi = 0; iPhi < nInternalPhi; iPhi++) {
+        //for (int iPhi = 0; iPhi < fluxEl->NShapeF(); iPhi++) {
+            integrationResult(iPhi, 0) += w * elData.divphi(iPhi + firstInternalPhi, 0);
+            //integrationResult(iPhi, 0) += w * elData.divphi(iPhi, 0);
         }
     }
-    
+   
+    // Test if obtained results is equal (numerically) to zero
     bool isZero;
     for (int i = 0; i < integrationResult.Rows(); i++) {
    //     if (IsZero(integrationResult(i, 0))) {
