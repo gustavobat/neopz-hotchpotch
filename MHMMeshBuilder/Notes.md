@@ -1,10 +1,9 @@
 # ```MHMixedMeshControl``` today
 
 ## Constructor
-
 - Enters ```MHMeshControl``` constructor. Here, ```fGMesh``` is initialized with ```gmesh```
-passed to the MHMMixedMeshControl constructor. The variables ```fGeoToMHMDomain```,
-```fMHMtoSubCMesh```, ```fGlobalSystemSize```, ```fGlobalSystemWithLocalCondensationSize``` and
+passed as a parameter. The variables ```fGeoToMHMDomain```, ```fMHMtoSubCMesh```,
+ ```fGlobalSystemSize```, ```fGlobalSystemWithLocalCondensationSize``` and
 ```fNumeq``` are initialized with zero/default values.
 Inside the function we have:
 ```
@@ -49,7 +48,23 @@ A temporary computational mesh is created by the method ```CriaMalhaTemporaria()
 the following:
 
 - Resets ```fGMesh``` reference;
-- 
+- Iterates through mesh elements, filtering 2D elements;
+- Inserts element mat id into set variable;
+- Filters (d-1)-dimensional sides
+- Gets side neighbour, if ```neighbour.Element()``` is (d-1)-dimensional, inserts its material id
+into a bcIds set, ends first for loop
+- Creates a dummy compmesh, inserts dummy materials for the IDs contained in both sets,
+sets all create functions discontinuous
+- Creates CompEl for each element (0, 1, 2, 3) of ```fMHMtoSubCMesh```, checking its a volume 
+element. The compel is created and if it has a boundary condition, a (d-1)-dimensional comp 
+element is created
+- Calls ```TPZCreateApproximationSpace::CreateInterfaces(*cmesh)``` and 
+```cmesh->ExpandSolution()```, this creates interface GeoElements
+- Returns cmesh to ```CreateSkeletonElements()``` method
 
- 
+An iteration occurs over mesh elements.
+
+
+
+# The new MHMMeshBuilder class
 
